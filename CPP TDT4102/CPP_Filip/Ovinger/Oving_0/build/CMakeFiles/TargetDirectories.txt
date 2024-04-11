@@ -1,0 +1,2 @@
+C:/Users/filip/OneDrive - NTNU/Desktop/C++/Oving_0/build/CMakeFiles/edit_cache.dir
+C:/Users/filip/OneDrive - NTNU/Desktop/C++/Oving_0/build/CMakeFiles/rebuild_cache.dir

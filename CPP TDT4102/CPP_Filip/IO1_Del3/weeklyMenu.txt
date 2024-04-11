@@ -1,0 +1,8 @@
+Type: Vegan
+Hovedrett: Beef
+Tilbehør: Pasta
+Pris: 175
+Type: Organic
+Hovedrett: Burger
+Tilbehør: Rice
+Pris: 105
