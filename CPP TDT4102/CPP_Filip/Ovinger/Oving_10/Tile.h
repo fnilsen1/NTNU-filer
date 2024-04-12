@@ -22,6 +22,10 @@ class Tile : public TDT4102::Button
 												{7, TDT4102::Color::dark_red},
 												{8, TDT4102::Color::gold}};
 
+
+    bool isMine = false;
+    friend class MinesweeperWindow;
+
 public:
 	Tile(TDT4102::Point pos, int size);
 
@@ -29,4 +33,8 @@ public:
 	void flag();
 
 	Cell getState() const { return state; };
+
+    bool getIsMine();
+    void setIsMine(bool state);
+    void setAdjMines(int n);
 };

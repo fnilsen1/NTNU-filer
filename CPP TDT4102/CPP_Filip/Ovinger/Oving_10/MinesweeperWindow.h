@@ -1,6 +1,8 @@
 #pragma once
 #include "AnimationWindow.h"
 #include "Tile.h"
+#include "widgets/Button.h"
+#include "widgets/TextInput.h"
 
 using namespace std;
 using namespace TDT4102;
@@ -12,6 +14,7 @@ public:
 	// storrelsen til hver tile
 	static constexpr int cellSize = 30;
 	MinesweeperWindow(int x, int y, int width, int height, int mines, const string& title);
+    TextInput textField {{50, 350}, 200, 30, "Game in progress"};
 private:
 	const int width;		// Bredde i antall tiles
 	const int height;		// Hoyde i antall tiles
@@ -21,6 +24,10 @@ private:
 	// hoyde og bredde i piksler
 	int Height() const { return height * cellSize; } 
 	int Width() const { return width * cellSize; }
+
+    
+
+    
 
 	// Returnerer en vektor med nabotilene rundt en tile, der hver tile representeres som et punkt
 	vector<Point> adjacentPoints(Point xy) const;
@@ -34,6 +41,7 @@ private:
 	// Returnerer en tile gitt et punkt
 	shared_ptr<Tile>& at(Point xy) { return tiles[xy.x / cellSize + (xy.y / cellSize) * width]; }
 	const shared_ptr<Tile>& at(Point xy) const { return tiles[xy.x / cellSize + (xy.y / cellSize) * width]; }
+    int cellsClicked = 0;
 
     //aapne og flagge rute
 	void openTile(Point xy);
@@ -42,4 +50,5 @@ private:
 	// callback funksjoner til Tile knappene
 	void cb_click();
 	
+    int countMines(vector<Point> points);
 };
