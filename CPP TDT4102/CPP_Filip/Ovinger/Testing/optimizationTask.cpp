@@ -4,19 +4,23 @@
 
 // Utdelt kode til oppgave 3
 
-//Itererer gjennom diagonalen i stedet (1 for loop)
 void setDiagonalValue(std::vector<std::vector<double>>& matrix, double newValue){
-    for (int i = 0; i < matrix.size(); i++){
-        matrix[i][i]=newValue;
+    for (int row = 0; row < matrix.size(); row++){
+        for (int col = 0; col < matrix.size(); col++){
+            bool isDiagonal = (row == col);
+            if (isDiagonal){
+                matrix.at(row).at(col) = newValue;
+            }
+        }
     }
 }
 
-//Itererer gjennom rader og så kolonner. Da ligger elementene nærme hverandre i minnet: Cache
 double sumMatrix(std::vector<std::vector<double>> matrix){
     double sum;
-    for (int row = 0; row < matrix.size(); row++){
-        for (int col = 0; col < matrix.size(); col++){
-            sum += matrix[row][col];            
+    for (int col = 0; col < matrix.size(); col++){
+        for (int row = 0; row < matrix.size(); row++){
+            double value = matrix.at(row).at(col);
+            sum += value;            
         }
     }
     return sum;
@@ -29,10 +33,11 @@ void optimizationTask() {
     // Create a matrix with zeros
     std::vector<std::vector<double>> matrix;
     
-    //Bruker resize i stedet for loop
     for (int i = 0; i < matrixSize; i++){
         std::vector<double> column;
-        column.resize(matrixSize);
+        for (int j = 0; j < matrixSize; j++){
+            column.push_back(0.0);
+        }
         matrix.push_back(column);
     }
 

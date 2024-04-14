@@ -137,6 +137,11 @@ cout << "1 millioner elementer optimalisert med reserve og resize" << endl;
 optimizedMillionVector();
 
 //12.8104 vs 6.53327 sekunder før og etter optimalisering
+/*
+Uten optimalisering: 5.25 vs 2.24
+Med optimalisering: 1.87 vs 1.05
+*/
+
 timeOperation(optimizationTask, 1);
 
 int a = 1;

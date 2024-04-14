@@ -29,7 +29,9 @@ src = []
 exe = executable(
   'program',
   src,
+'Stopwatch.cpp',
 'main.cpp',
+'optimizationTask.cpp',
   dependencies : [animationwindow_dep, sdl2_dep],
   cpp_args : compiler_flags
 )
