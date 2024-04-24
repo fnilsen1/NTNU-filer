@@ -8,12 +8,10 @@ using namespace std;
 
 int main()
 {
-Stopwatch s;
-s.start();
-optimizationTask();
-cout << s.stop();
-int a;
-cin >> a;
+for(int i = 0; i<10; ++i){
+cout << i << endl;
+}
+
 return 0;
 };
 
