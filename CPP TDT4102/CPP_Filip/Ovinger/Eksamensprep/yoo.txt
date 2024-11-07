@@ -1,0 +1,3 @@
+On non-mobile versions of our website, a small bronze star icon (This 
+star symbolizes the featured content on Wikipedia.) on the top right corner of an article's page indicates that the article is featured.
+On most smartphones and tablets you can also select "Desktop" at the very bottom of the page or "Request Desktop Site" in your browser's menu to see this line (do a search to find out how).
