@@ -1,0 +1,54 @@
+div {
+    font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+    border-radius: 20px;
+}
+
+.number1 {
+    margin: 10px;
+    padding: 10px;
+    background-color: rgb(67, 137, 180);
+    font-family: "Pinyon Script", cursive;
+    font-weight: 400;
+    font-style: normal;
+    border: dotted black 10px;
+    margin-left: 20%;
+    margin-right: 20%;
+    display: flex;
+    justify-content: center;
+    /* keep items on the left */
+    align-items: center;
+    text-align: left;
+    gap: 50px;
+    /* small space between text and image */
+}
+
+#keep {
+    width: 150px;
+    height: auto;
+    margin-left: 0;
+    /* remove extra left margin */
+}
+
+.Broken {
+    color: black;
+    margin-left: 5%;
+}
+
+.number2 {
+    margin: 10px 20px;
+    padding: 10px 20px;
+    background-color: orange;
+    border: groove 5px;
+}
+
+.number3 {
+    margin: 10px 20px 30px;
+    padding: 10px 20px 30px;
+    background-color: yellow;
+}
+
+.number4 {
+    margin: 10px 20px 30px 40px;
+    padding: 10px 20px 30px 40px;
+    background-color: greenyellow;
+}
