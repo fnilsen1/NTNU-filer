@@ -4,9 +4,8 @@
 
 #include <string>
 
-
-
-int main() {
+int main()
+{
     // Rank r = Rank::king;
     // Suit s = Suit::hearts;
     // string rank = rankToString(r);
@@ -21,6 +20,4 @@ int main() {
     deck.print();
 
     return 0;
-
 }
-

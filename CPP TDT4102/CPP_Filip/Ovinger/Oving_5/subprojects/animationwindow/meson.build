@@ -15,6 +15,7 @@ build_files = [
     'src/internal/nuklear_implementation.cpp',
     'src/widgets/Button.cpp',
     'src/widgets/TextInput.cpp',
+    'src/widgets/TextBox.cpp',
     'src/widgets/DropdownList.cpp',
     'src/AnimationWindow.cpp', 
     'src/Color.cpp', 
