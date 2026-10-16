@@ -31,8 +31,9 @@ class SensorGNSS:
             H (ndarray[3, 15]): the measurement matrix
         """
 
-        # TODO remove this
-        H = sensors_solu.SensorGNSS.H(self, x_nom)
+        H = np.zeros((3, 15))
+        H[:, 0:3] = np.eye(3)
+        H[:, 6:9] = -x_nom.ori.as_rotmat() @ get_cross_matrix(self.lever_arm)
         return H
 
     def pred_from_est(self, x_est: EskfState,
@@ -47,12 +48,11 @@ class SensorGNSS:
         """
         x_est_nom = x_est.nom
         x_est_err = x_est.err
-        z_pred = np.zeros(3)  # TODO
-        S = np.eye(3)  # TODO
+        z_pred = x_est_nom.pos + x_est_nom.ori.as_rotmat() @ self.lever_arm
+        H = self.H(x_est_nom)
+        S = H @ x_est_err.cov @ H.T + self.R
 
         z_pred = GnssMeasurement.from_array(z_pred)
         z_gnss_pred_gauss = MultiVarGauss[GnssMeasurement](z_pred, S)
 
-        # TODO remove this
-        z_gnss_pred_gauss = sensors_solu.SensorGNSS.pred_from_est(self, x_est)
         return z_gnss_pred_gauss

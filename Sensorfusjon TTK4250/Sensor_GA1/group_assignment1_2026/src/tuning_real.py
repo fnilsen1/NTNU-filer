@@ -25,8 +25,8 @@ imu_real = ModelIMU(
     gyro_bias_std=5e-5,  # Gyro bias standard deviation
     gyro_bias_p=1e-16,  # Gyro inv time constant see (6.78)
 
-    accm_correction=accm_corr,  # Accelerometer correction matrix
-    gyro_correction=gyro_corr,  # Gyro correction matrix
+    accm_correction=np.round(accm_corr),
+    gyro_correction=np.round(gyro_corr),
 )
 
 gnss_real = SensorGNSS(
