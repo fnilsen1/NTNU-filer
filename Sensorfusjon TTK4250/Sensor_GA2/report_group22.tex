@@ -1,0 +1,115 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[margin=18mm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{float}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt}
+
+\begin{document}
+\begin{center}
+{\Large TTK4250 Group Assignment 2}\\[4pt]
+Group 22\\
+Filip Nilsen
+\end{center}
+
+\section*{Task 2: Simulated data}
+I used the supplied settings as a baseline and changed one group of parameters at a time. All results use 999 scan steps. The map counts refer to the 78 true landmarks that were observed.
+
+\begin{center}
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+Setting & Mapped & Spurious & RMSE $x/y$ (m) & ANEES & ANIS/DOF \\
+\midrule
+Baseline & 72 & 3 & 0.72 / 0.80 & 8.37 & 0.33 \\
+Range 0.1 m, bearing $1^\circ$ & 75 & 0 & 0.33 / 0.38 & 7.64 & 0.96 \\
+Odometry 0.05 m, $1^\circ$ & 75 & 0 & 0.34 / 0.38 & 0.92 & 0.20 \\
+M of N rule $M=3,N=5$ & 62 & 10 & 0.82 / 0.91 & 7.99 & 0.34 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The smaller measurement noise gave the best map and position error. Its landmark ANIS is 0.96, close to the expected value of 1. The baseline ANIS of 0.33 suggests that the predicted measurement uncertainty is too large. The pose ANEES remains high even after measurement tuning. Only 73.5\% of the pose NEES values are inside their 95\% bounds, so the pose covariance is still too small relative to the observed errors. Nearby poses share measurements and are correlated, so the ANEES interval should not be treated as an independent-sample test.
+
+Increasing odometry noise made the pose covariance much larger and reduced ANEES to 0.92. This does not mean the trajectory is better calibrated overall, since landmark ANIS fell to 0.20. With the stricter M of N rule, fewer landmarks were confirmed. The trajectory then had fewer landmark constraints, and the map had more missed and spurious landmarks.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.60\textwidth]{runs/sim/measurement_tighter/figures/final_snapshot.pdf}
+\caption{Simulated trajectory and map with the tighter measurement noise.}
+\end{figure}
+
+\newpage
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{runs/sim/measurement_tighter/figures/pose_diagnostics.pdf}
+\caption{Position and heading errors with covariance envelopes.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.79\textwidth]{runs/sim/measurement_tighter/figures/pose_nees.pdf}
+\caption{Pose NEES for the tighter measurement noise setting.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.79\textwidth]{runs/sim/measurement_tighter/figures/landmark_nis.pdf}
+\caption{Landmark NIS per degree of freedom for the same run.}
+\end{figure}
+
+\newpage
+\section*{Task 3: Victoria Park}
+The real data have no ground truth. GPS was used only as a reference and was not added to the graph. All values below come from full runs over the 7247 laser scans.
+
+\begin{center}
+\small
+\begin{tabular}{lrrrr}
+\toprule
+Setting & Landmarks & Landmark ANIS/DOF & GPS RMS (m) & GPS ANIS \\
+\midrule
+Baseline & 288 & 0.26 & 1.79 & 2.73 \\
+Range 0.18 m, bearing $0.45^\circ$ & 293 & 0.28 & 1.78 & 2.73 \\
+Odometry yaw $0.55^\circ$ & 293 & 0.27 & 1.78 & 2.70 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The baseline follows the available GPS positions closely, but the landmark ANIS is well below 1. Only 23.6\% of its per-step landmark NIS values lie inside the 95\% bounds. Reducing measurement noise slightly raises ANIS without changing the GPS distance much. A small reduction in odometry yaw noise has a similar but smaller effect. Larger noise reductions were tried on the first 2000 scans. They caused more landmarks to be created and the trajectory to drift away from GPS. This is consistent with true re-observations failing the association gate and being treated as new landmarks. A stricter M of N rule was also checked on 2000 scans, but it was not used for a full-run result.
+
+The GPS ANIS is above its expected value of 2, while the landmark ANIS is below 1. These statistics use different residuals and should not be expected to agree. The assumed GPS standard deviation is 1 m, and GPS is missing during part of the drive. Loop closures link current poses to trees seen earlier and let the optimizer adjust past poses as well as the current one. A practical improvement would be better measurement noise calibration and more reliable association at revisited trees.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.52\textwidth]{runs/real/baseline/figures/final_snapshot.pdf}
+\caption{Victoria Park trajectory and map compared with available GPS positions.}
+\end{figure}
+
+\newpage
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.86\textwidth]{runs/real/baseline/figures/landmark_nis.pdf}
+\caption{Landmark NIS for the full Victoria Park baseline run.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.86\textwidth]{runs/real/baseline/figures/position_nis.pdf}
+\caption{GPS position NIS where GPS measurements are available.}
+\end{figure}
+
+\section*{Task 4: One wrong association}
+At step 600 I forced one measurement to be paired with the wrong landmark. With ordinary least squares, the position RMSE rose from 0.72 / 0.80 m to 4.51 / 5.12 m. The map had 73 spurious landmarks instead of 3, and the pose ANEES rose to 3794. The wrong factor pulled the optimized poses and map away from their earlier estimates. This also affected later predictions and associations. The landmark NIS spikes at the wrong step and remains disturbed afterward.
+
+With a Huber loss and $k=1.345$, the cost grows roughly linearly for a residual larger than the threshold in measurement standard deviations. The wrong factor therefore has less influence. The result stayed close to the baseline with 3 spurious landmarks and position RMSE of 0.72 / 0.80 m. Huber does not correct the association itself, but it limits its effect. In a factor graph, a bad factor can also be removed and the graph optimized again. An EKF applies each update directly to its state and covariance, so recovery usually requires a saved earlier state or a delayed association decision.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.49\textwidth]{runs/sim/task4_least_squares/figures/wrong_association.pdf}
+\includegraphics[width=0.49\textwidth]{runs/sim/task4_huber/figures/wrong_association.pdf}
+\caption{Landmark NIS and association counts around step 600. Least squares is left and Huber is right.}
+\end{figure}
+
+\end{document}

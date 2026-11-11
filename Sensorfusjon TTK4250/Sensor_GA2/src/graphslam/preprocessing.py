@@ -52,8 +52,9 @@ def relative_pose(
     gtsam.Pose2
         The relative pose increment over the interval.
     """
-    # TODO(a): build the body twist and integrate it over dt with the exponential map.
-    raise NotImplementedError("Task 1 (a)")
+    velocity = vel_encoder / (1 - car.H * np.tan(steer) / car.L)
+    yaw_rate = velocity * np.tan(steer) / car.L
+    return gtsam.Pose2.Expmap(np.array([velocity * dt, 0.0, yaw_rate * dt]))
 
 
 # ---------------------------------------------------------------------------
@@ -81,8 +82,16 @@ def preintegrate(
     np.ndarray, shape=(3, 3)
         Its covariance.
     """
-    # TODO(b): compound the increments and propagate the covariance.
-    raise NotImplementedError("Task 1 (b)")
+    pose = gtsam.Pose2()
+    covariance = np.zeros((3, 3))
+
+    for increment, increment_covariance in zip(poses, covariances):
+        H1 = np.zeros((3, 3), order="F")
+        H2 = np.zeros((3, 3), order="F")
+        pose = pose.compose(increment, H1, H2)
+        covariance = H1 @ covariance @ H1.T + H2 @ increment_covariance @ H2.T
+
+    return pose, covariance
 
 
 # ---------------------------------------------------------------------------

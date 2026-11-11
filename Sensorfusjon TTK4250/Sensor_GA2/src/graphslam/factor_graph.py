@@ -66,8 +66,7 @@ def predict_pose(previous_pose: gtsam.Pose2, relative_pose: gtsam.Pose2) -> gtsa
     gtsam.Pose2
         The predicted pose x_k.
     """
-    # TODO(c1): compose the relative pose onto the previous pose.
-    raise NotImplementedError("Task 1 (c1)")
+    return previous_pose.compose(relative_pose)
 
 
 def add_odometry_factor(
@@ -90,8 +89,8 @@ def add_odometry_factor(
     relative_pose_cov : np.ndarray, shape=(3, 3)
         Covariance of that increment, in the tangent space of ``relative_pose``.
     """
-    # TODO(c2): add a BetweenFactorPose2 with a full-covariance Gaussian noise model.
-    raise NotImplementedError("Task 1 (c2)")
+    noise_model = gtsam.noiseModel.Gaussian.Covariance(relative_pose_cov)
+    graph.add(gtsam.BetweenFactorPose2(key_previous, key_current, relative_pose, noise_model))
 
 
 def add_landmark_factor(
@@ -115,8 +114,12 @@ def add_landmark_factor(
     noise_model : gtsam.noiseModel.Base
         From :func:`bearing_range_noise_model`, ordered [bearing, range].
     """
-    # TODO(c3): add a BearingRangeFactor2D. Mind the argument order.
-    raise NotImplementedError("Task 1 (c3)")
+    distance, angle = measurement
+    graph.add(
+        gtsam.BearingRangeFactor2D(
+            pose_key, landmark_key, gtsam.Rot2(float(angle)), float(distance), noise_model
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -146,8 +149,18 @@ def predict_measurement(
     H_landmark : np.ndarray, shape=(2, 2)
         d z / d m_j.
     """
-    # TODO(d): predict [range, bearing] and stack the two rows of each Jacobian.
-    raise NotImplementedError("Task 1 (d)")
+    H_range_pose = np.zeros((1, 3), order="F")
+    H_range_landmark = np.zeros((1, 2), order="F")
+    H_bearing_pose = np.zeros((1, 3), order="F")
+    H_bearing_landmark = np.zeros((1, 2), order="F")
+
+    distance = pose.range(landmark, H_range_pose, H_range_landmark)
+    angle = pose.bearing(landmark, H_bearing_pose, H_bearing_landmark).theta()
+
+    z = np.array([distance, angle])
+    H_pose = np.vstack((H_range_pose, H_bearing_pose))
+    H_landmark = np.vstack((H_range_landmark, H_bearing_landmark))
+    return z, H_pose, H_landmark
 
 
 def inverse_measurement(pose: gtsam.Pose2, measurement: np.ndarray) -> np.ndarray:
@@ -165,8 +178,9 @@ def inverse_measurement(pose: gtsam.Pose2, measurement: np.ndarray) -> np.ndarra
     np.ndarray, shape=(2,)
         Landmark position in the world frame.
     """
-    # TODO(g): rotate by the bearing, translate by the range, map to the world frame.
-    raise NotImplementedError("Task 1 (g)")
+    distance, angle = measurement
+    point = gtsam.Rot2(float(angle)).rotate(gtsam.Point2(float(distance), 0.0))
+    return pose.transformFrom(point)
 
 
 # ---------------------------------------------------------------------------
@@ -194,8 +208,9 @@ def assemble_joint_covariance(
     np.ndarray, shape=(3 + 2n, 3 + 2n)
         P, whose block (i, j) is the covariance between ``keys[i]`` and ``keys[j]``.
     """
-    # TODO(e): fill P block by block from joint_marginal.at(key_i, key_j).
-    raise NotImplementedError("Task 1 (e)")
+    return np.block(
+        [[joint_marginal.at(key_i, key_j) for key_j in keys] for key_i in keys]
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -228,8 +243,15 @@ def innovation_covariance(
     np.ndarray, shape=(2n, 2n)
         The innovation covariance ``S``.
     """
-    # TODO(f): build the stacked H, build the block-diagonal R, and form S.
-    raise NotImplementedError("Task 1 (f)")
+    n = len(jacobians_pose)
+    H = np.zeros((2 * n, 3 + 2 * n))
+
+    for i, (H_pose, H_landmark) in enumerate(zip(jacobians_pose, jacobians_landmark)):
+        H[2 * i : 2 * i + 2, :3] = H_pose
+        H[2 * i : 2 * i + 2, 3 + 2 * i : 5 + 2 * i] = H_landmark
+
+    R = np.kron(np.eye(n), measurement_cov)
+    return H @ joint_covariance @ H.T + R
 
 
 # ---------------------------------------------------------------------------
