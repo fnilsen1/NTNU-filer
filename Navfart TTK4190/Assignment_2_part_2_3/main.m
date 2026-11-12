@@ -6,37 +6,38 @@
 % Add folder for 3-D visualization files
 addpath(genpath('flypath3d_v3'))
 
-%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% USER INPUTS
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% User inputs and initial states
 clc; clear; close all;
-T_final = 1000;	        % Final simulation time (s)
-h = 0.1;                % Sampling time (s)
+T_final = 8000;
+h = 0.1;
+U_ref = 9;
 
-psi_ref_initial = deg2rad(10);
-psi_ref_final   = deg2rad(-20);
-t_switch = 500;
-U_ref   = 7;            % desired surge speed (m/s)
+V_c = 1;                 % current
+beta_vc = deg2rad(45);
+wind_enabled = false;
 
-% initial states
-eta_0 = [0 0 0]';
+load('WP.mat', 'WP');
+k = 1;                   % waypoint number
+lookahead = 1000;         
+Kp_los = 1/lookahead;
+R_switch = 200;           
+
+eta_0 = [WP(:,1); deg2rad(-110)];
 nu_0  = [0 0 0]';
 delta_0 = 0;
 n_0 = 0;
 Qm_0 = 0; 
-x = [nu_0' eta_0' delta_0 n_0]'; % The state vector can be extended with addional states here
+x = [nu_0; eta_0; delta_0; n_0; Qm_0]; % The state vector can be extended with addional states here
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% MAIN LOOP
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Simulation setup and controller tuning
 t = 0:h:T_final;                % Time vector
 nTimeSteps = length(t);         % Number of time steps
 
 simdata = zeros(nTimeSteps, 13); % Pre-allocate matrix for efficiency
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% %%%%%%%%%%%%%%%%%%%%%%%%%%
 % Part 2(d)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% %%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Nomoto parameters from parts (b) and (c)
 T_nomoto = 169.549327;
@@ -63,11 +64,13 @@ e_int = 0;
 % Match the rudder-angle limit
 delta_max = deg2rad(40);
 
+%% Simulation loop
 for i = 1:nTimeSteps
     
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %% Ocean current
+    % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Part 2, 1a) Add current here 
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     V_c = 1; % current speed
     beta_vc = deg2rad(45); % current direction
 
@@ -76,9 +79,10 @@ for i = 1:nTimeSteps
     
     nu_c = [ uc vc 0 ]';
     
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %% Wind forces
+    % %%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Part 2, 1c) Add wind here 
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % %%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     % Wind parameters
     V_w = 10;                 % wind speed
@@ -92,7 +96,7 @@ for i = 1:nTimeSteps
     Ywind = 0;
     Nwind = 0;
 
-    if t(i) >= 200
+    if wind_enabled && t(i) >= 200
         % Wind velocity expressed in body axes
         u_w = V_w * cos(beta_Vw - x(6));
         v_w = V_w * sin(beta_Vw - x(6));
@@ -115,7 +119,8 @@ for i = 1:nTimeSteps
 
     tau_wind = [0; Ywind; Nwind];
     
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %% Heading command and reference model
+    % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Part 2, 2d) Add a reference model here 
     % Define it as a function
     % check eq. (15.143) in (Fossen, 2021) for help
@@ -124,7 +129,7 @@ for i = 1:nTimeSteps
     % xd_dot = ref_model(xd,psi_ref(i));
     % psi_d = xd(1);
     % r_d = xd(2);
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     psi_d = xd(1);
     r_d = xd(2);
     u_d = U_ref;
@@ -134,15 +139,19 @@ for i = 1:nTimeSteps
     else
         psi_ref = psi_ref_final;
     end
+
+
+
     xd_dot = ref_model(xd, psi_ref, omega_ref);
     
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %% Heading PID and anti-windup
+    % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Part 2, 2d) Add the heading controller here 
     % Define it as a function
     %
     % The result should look like this:
     % delta_c = PID_heading(e_psi,e_r,e_int);
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     e_psi = atan2(sin(x(6) - psi_d), cos(x(6) - psi_d));
     e_r = x(3) - r_d;
@@ -157,24 +166,25 @@ for i = 1:nTimeSteps
         e_int = e_int + h*e_psi;
     end
 
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %% Speed control
+    % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Part 2, 3e) Add open loop speed control here
     % Define it as a function
     %
     % The result should look like this:
     % n_c = open_loop_speed_control(U_ref);
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    n_c = 10;                   % propeller speed [radians per second (rps)]
-
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    n_c =  open_loop_speed_control(U_ref);                   % propeller speed [revolutions per second (rps)]
+    % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Part 2, 3f) Replace the open loop speed controller, 
     % with a closed loop speed controller here 
     % Define it as a function
     %
     % The result should look like this:
     % n_c = closed_loop_speed_control(u_d,e_u,e_int_u);
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
+    %% Ship dynamics, logging, and integration
     % ship dynamics
     u = [delta_c n_c]';
     [xdot,tau_total] = ship(x,u,nu_c,tau_wind);
@@ -188,6 +198,7 @@ for i = 1:nTimeSteps
     x = rk4(@ship,h,x,u,nu_c,tau_wind);
     xd = xd + h*xd_dot;
 
+    %% Progress reporting
     % --- Progress Update Logic ---
     if mod(i, floor(nTimeSteps / 10)) == 0 % Print an update every 10%
         progress = (i/nTimeSteps) * 100;
@@ -200,9 +211,7 @@ for i = 1:nTimeSteps
 end
 simdata = simdata(1:i,:);
 t = t(1:i);
-%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% PLOTS
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Unpack simulation data
 u           = simdata(:,1);                 % m/s
 v           = simdata(:,2);                 % m/s
 r           = simdata(:,3);                 % rad/s
@@ -212,19 +221,28 @@ y           = simdata(:,5);                 % m
 psi         = simdata(:,6);                 % rad
 psi_deg     = (180/pi) * psi;               % deg
 delta_deg   = (180/pi) * simdata(:,7);      % deg
-n           = (30/pi) * simdata(:,8);       % rpm
+n = 60 * simdata(:,8);       % revolutions/s -> rpm
 delta_c_deg = (180/pi) * simdata(:,9);      % deg
-n_c         = (30/pi) * simdata(:,10);      % rpm
+n_c = 60 * simdata(:,10);    % revolutions/s -> rpm
 u_d         = simdata(:,11);                % m/s
 psi_d       = simdata(:,12);                % rad
 psi_d_deg   = (180/pi) * psi_d;             % deg
 r_d         =  simdata(:,13);               % rad/s
 r_d_deg     = (180/pi) * r_d;               % deg/s
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Surge, sideslip, and crab plots
 % Part 2 1b)
 uc = V_c * cos(beta_vc - psi);
 vc = V_c * sin(beta_vc - psi);
+
+figure(11);
+clf;
+plot(t, u, t, u-uc, t, u_d, '--', 'LineWidth', 1.5);
+grid on;
+xlabel('Time (s)');
+ylabel('Surge velocity (m/s)');
+legend('Ground-relative surge', 'Water-relative surge', ...
+    'Desired speed', 'Location', 'best');
 
 beta = atan2(v - vc, u - uc);  % Sideslip angle
 beta_c = atan2(v, u);          % Crab angle
@@ -246,8 +264,8 @@ xlabel('Time (s)');
 ylabel('Angle (deg)');
 legend('Sideslip', 'Crab');
 grid on;
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% Position and yaw plots
 figure(3)
 figure(gcf)
 subplot(311)
@@ -262,6 +280,7 @@ plot(t,r_deg,t,r_d_deg,'linewidth',2);
 title('Actual and desired yaw rates'); xlabel('Time (s)');  ylabel('Angle rate (deg/s)'); 
 legend('actual yaw rate','desired yaw rate')
 
+%% Speed and actuator plots
 figure(2)
 figure(gcf)
 subplot(311)
@@ -299,22 +318,27 @@ flypath('flypath3d_v3/ship1.mat',...
 'ylim', [min(x)-0.1*max(abs(x)),max(x)+0.1*max(abs(x))], ...
 'zlim', [-max(max(abs(x)),max(abs(y)))/100,max(max(abs(x)),max(abs(y)))/20]); 
 
+%% Heading tracking plot
 psi_command = rad2deg(psi_ref_initial)*ones(size(t));
 psi_command(t >= t_switch) = rad2deg(psi_ref_final);
 
-figure;
+figure(10);
+clf;
 plot(t, psi_command, 'k:', 'LineWidth', 1.5);
 hold on;
 plot(t, psi_d_deg, 'b--', 'LineWidth', 1.5);
 plot(t, psi_deg, 'r', 'LineWidth', 1.5);
-xline(t_switch, ':', 'Setpoint change');
 grid on;
 xlabel('Time (s)');
 ylabel('Heading (deg)');
 legend('Heading command', 'Reference-model heading', ...
     'Actual heading', 'Location', 'best');
-title('Heading tracking: 10 degrees followed by -20 degrees');
+title('Heading tracking: 10 degrees');
 
+%% Map plot
+pathplotter(x,y)
+
+%% Local functions
 function xd_dot = ref_model(xd, psi_ref, omega_ref)
 % States: xd = [psi_d; r_d; a_d]
 
@@ -330,4 +354,20 @@ end
 
 function delta_c = PID_heading(e_psi, e_r, e_int, Kp, Kd, Ki)
 delta_c = -Kp*e_psi - Kd*e_r - Ki*e_int;
+end
+
+function n_d = open_loop_speed_control(U_ref)
+m = 17.0677e6;
+Xudot = -8.9830e5;
+T1 = 20;
+
+rho = 1025;
+Dia = 3.3;
+KT = 0.6366516179;
+t_thr = 0.05;
+
+Xu = -(m - Xudot)/T1;
+T_d = -Xu * U_ref / (1 - t_thr);
+
+n_d = sqrt(T_d / (rho * Dia^4 * KT));
 end
