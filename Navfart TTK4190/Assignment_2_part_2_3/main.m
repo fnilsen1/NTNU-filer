@@ -10,6 +10,7 @@ h = 0.1;                % Sampling time (s)
 
 U_ref = 9;            % desired surge speed (m/s)
 V_c = 1;              % current speed
+use_ilos = true;
 crab_compensation_enabled = false;
 beta_vc = deg2rad(45);
 wind_enabled = false;
@@ -19,7 +20,10 @@ load('WP.mat', 'WP');
 k = 1;
 lookahead = 1000;
 Kp_los = 1/lookahead;
-R_switch = 200;
+Ki_ilos = 0.001;
+kappa_ilos = 1;
+y_int = 0;
+R_switch = 250;
 
 % initial states
 eta_0 = [WP(:,1); deg2rad(-110)];
@@ -117,15 +121,24 @@ for i = 1:nTimeSteps
 
     tau_wind = [0; Ywind; Nwind];
     
-    %% Waypoint selection and LOS guidance
+    %% Waypoint selection and guidance
+    k_previous = k;
     [x_start, y_start, x_end, y_end, k, last] = WP_selector(x(4:5), WP, k, R_switch);
+    if use_ilos && k ~= k_previous
+        y_int = 0;
+    end
     [e_y, pi_h] = crossTrackError(x_start, y_start, x_end, y_end, x(4), x(5));
     e_y_history(i) = e_y;
-    chi_d = LOS_guidance(e_y, pi_h, Kp_los);
-    beta_c = atan2(x(2), x(1));
-    psi_ref = chi_d;
-    if crab_compensation_enabled
-        psi_ref = psi_ref - beta_c;
+    if use_ilos
+        [psi_ref, y_int_dot] = guidance(e_y, pi_h, y_int, lookahead, Ki_ilos, kappa_ilos);
+        y_int = y_int + h*y_int_dot;
+    else
+        chi_d = LOS_guidance(e_y, pi_h, Kp_los);
+        psi_ref = chi_d;
+        if crab_compensation_enabled
+            beta_c = atan2(x(2), x(1));
+            psi_ref = psi_ref - beta_c;
+        end
     end
 
     %% Heading reference model
@@ -335,7 +348,7 @@ xlabel('Time (s)');
 ylabel('Heading (deg)');
 legend('Heading command', 'Reference-model heading', 'Actual heading', ...
     'Course', 'Location', 'best');
-title('Heading tracking with LOS guidance');
+title('Heading tracking');
 
 %% Cross-track error plot
 figure(7);

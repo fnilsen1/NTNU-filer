@@ -1,6 +1,6 @@
-function chi_d = guidance(position, WP, k, lookahead)
+function [psi_ref, y_int_dot] = guidance(e_y, pi_h, y_int, Delta, Ki, kappa)
 
-[e_y, pi_h] = crossTrackError(WP(1,k), WP(2,k), WP(1,k+1), WP(2,k+1), ...
-    position(1), position(2));
-chi_d = LOS_guidance(e_y, pi_h, 1/lookahead);
+Kp = 1/Delta;
+psi_ref = pi_h - atan(Kp*e_y + Ki*y_int);
+y_int_dot = Delta*e_y / (Delta^2 + (e_y + kappa*y_int)^2);
 end
