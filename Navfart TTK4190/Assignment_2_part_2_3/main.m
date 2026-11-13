@@ -9,7 +9,8 @@ T_final = 8000;	        % Final simulation time (s)
 h = 0.1;                % Sampling time (s)
 
 U_ref = 9;            % desired surge speed (m/s)
-V_c = 0; % current speed
+V_c = 1;              % current speed
+crab_compensation_enabled = false;
 beta_vc = deg2rad(45);
 wind_enabled = false;
 show_animation = false;
@@ -33,6 +34,7 @@ t = 0:h:T_final;                % Time vector
 nTimeSteps = length(t);         % Number of time steps
 
 simdata = zeros(nTimeSteps, 14); % Pre-allocate matrix for efficiency
+e_y_history = zeros(nTimeSteps, 1);
 
 % %%%%%%%%%%%%%%%%%%%%%%%%%%
 % Part 2(d)
@@ -118,8 +120,13 @@ for i = 1:nTimeSteps
     %% Waypoint selection and LOS guidance
     [x_start, y_start, x_end, y_end, k, last] = WP_selector(x(4:5), WP, k, R_switch);
     [e_y, pi_h] = crossTrackError(x_start, y_start, x_end, y_end, x(4), x(5));
+    e_y_history(i) = e_y;
     chi_d = LOS_guidance(e_y, pi_h, Kp_los);
+    beta_c = atan2(x(2), x(1));
     psi_ref = chi_d;
+    if crab_compensation_enabled
+        psi_ref = psi_ref - beta_c;
+    end
 
     %% Heading reference model
     psi_d = xd(1);
@@ -200,6 +207,7 @@ if ~last
     fprintf('  Time limit reached before arrival.\n');
 end
 simdata = simdata(1:i,:);
+e_y_history = e_y_history(1:i);
 t = t(1:i);
 %% Unpack simulation data
 u           = simdata(:,1);                 % m/s
@@ -225,7 +233,7 @@ r_d_deg     = (180/pi) * r_d;               % deg/s
 uc = V_c * cos(beta_vc - psi);
 vc = V_c * sin(beta_vc - psi);
 
-figure(11);
+figure(2);
 clf;
 plot(t, u, t, u-uc, t, u_d, '--', 'LineWidth', 1.5);
 grid on;
@@ -246,7 +254,7 @@ beta(speed_relative < 0.01) = NaN;
 beta_deg = rad2deg(beta);
 beta_c_deg = rad2deg(beta_c);
 
-figure(4)
+figure(3)
 plot(t, beta_deg, t, beta_c_deg, 'LineWidth', 2);
 
 title('Sideslip and crab angles');
@@ -256,7 +264,7 @@ legend('Sideslip', 'Crab');
 grid on;
 
 %% Position and yaw plots
-figure(3)
+figure(4)
 figure(gcf)
 subplot(311)
 plot(y,x,'linewidth',2); axis('equal')
@@ -271,7 +279,7 @@ title('Actual and desired yaw rates'); xlabel('Time (s)');  ylabel('Angle rate (
 legend('actual yaw rate','desired yaw rate')
 
 %% Speed and actuator plots
-figure(2)
+figure(5)
 figure(gcf)
 subplot(311)
 plot(t,u,t,u_d,'linewidth',2);
@@ -313,19 +321,29 @@ end
 
 %% Heading tracking plot
 psi_command = rad2deg(simdata(:,14));
+chi = psi+beta_c;
 
-figure(10);
+figure(6);
 clf;
 plot(t, psi_command, 'k:', 'LineWidth', 1.5);
 hold on;
 plot(t, psi_d_deg, 'b--', 'LineWidth', 1.5);
 plot(t, psi_deg, 'r', 'LineWidth', 1.5);
+plot(t, rad2deg(chi), 'g-.', 'LineWidth', 1.5);
 grid on;
 xlabel('Time (s)');
 ylabel('Heading (deg)');
-legend('Heading command', 'Reference-model heading', ...
-    'Actual heading', 'Location', 'best');
+legend('Heading command', 'Reference-model heading', 'Actual heading', ...
+    'Course', 'Location', 'best');
 title('Heading tracking with LOS guidance');
+
+%% Cross-track error plot
+figure(7);
+plot(t, e_y_history, 'LineWidth', 1.5);
+grid on;
+xlabel('Time (s)');
+ylabel('Cross-track error (m)');
+title('Cross-track error');
 
 %% Map plot
 pathplotter(x,y)

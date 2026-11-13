@@ -18,7 +18,7 @@ WP_lat = [WP0_lat WP1_lat WP2_lat WP3_lat WP4_lat];
 
 l_0 = deg2rad(WP0_long); mu_0 = deg2rad(WP0_lat); h_ref = 0;
 
-figure(100);
+figure(8);
 geoplot(WP_lat,WP_long,'x-')
 [l,mu,~] = flat2llh(x,y,zeros(1,length(x)),l_0,mu_0,h_ref);
 l = rad2deg(l); mu = rad2deg(mu);
