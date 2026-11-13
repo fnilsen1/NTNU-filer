@@ -3,25 +3,24 @@
 % Author:           Your name
 % Study program:    Your study program
 
-% Add folder for 3-D visualization files
-addpath(genpath('flypath3d_v3'))
-
 %% User inputs and initial states
 clc; clear; close all;
-T_final = 8000;
-h = 0.1;
-U_ref = 9;
+T_final = 8000;	        % Final simulation time (s)
+h = 0.1;                % Sampling time (s)
 
-V_c = 1;                 % current
+U_ref = 9;            % desired surge speed (m/s)
+V_c = 0; % current speed
 beta_vc = deg2rad(45);
 wind_enabled = false;
+show_animation = false;
 
 load('WP.mat', 'WP');
-k = 1;                   % waypoint number
-lookahead = 1000;         
+k = 1;
+lookahead = 1000;
 Kp_los = 1/lookahead;
-R_switch = 200;           
+R_switch = 200;
 
+% initial states
 eta_0 = [WP(:,1); deg2rad(-110)];
 nu_0  = [0 0 0]';
 delta_0 = 0;
@@ -33,7 +32,7 @@ x = [nu_0; eta_0; delta_0; n_0; Qm_0]; % The state vector can be extended with a
 t = 0:h:T_final;                % Time vector
 nTimeSteps = length(t);         % Number of time steps
 
-simdata = zeros(nTimeSteps, 13); % Pre-allocate matrix for efficiency
+simdata = zeros(nTimeSteps, 14); % Pre-allocate matrix for efficiency
 
 % %%%%%%%%%%%%%%%%%%%%%%%%%%
 % Part 2(d)
@@ -55,7 +54,7 @@ Kd = (2*zeta*omega_n*T_nomoto - 1) / K_nomoto;
 Ki = (omega_n/10) * Kp;
 
 % Reference model states
-omega_ref = 0.03;
+omega_ref = 0.09;
 xd = [eta_0(3); nu_0(3); 0];
 
 % Heading-error integral
@@ -71,9 +70,6 @@ for i = 1:nTimeSteps
     % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Part 2, 1a) Add current here 
     % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    V_c = 1; % current speed
-    beta_vc = deg2rad(45); % current direction
-
     uc = V_c*cos(beta_vc-x(6));
     vc = V_c*sin(beta_vc-x(6));
     
@@ -119,31 +115,18 @@ for i = 1:nTimeSteps
 
     tau_wind = [0; Ywind; Nwind];
     
-    %% Heading command and reference model
-    % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % Part 2, 2d) Add a reference model here 
-    % Define it as a function
-    % check eq. (15.143) in (Fossen, 2021) for help
-    %
-    % The result should look like this:
-    % xd_dot = ref_model(xd,psi_ref(i));
-    % psi_d = xd(1);
-    % r_d = xd(2);
-    % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %% Waypoint selection and LOS guidance
+    [x_start, y_start, x_end, y_end, k, last] = WP_selector(x(4:5), WP, k, R_switch);
+    [e_y, pi_h] = crossTrackError(x_start, y_start, x_end, y_end, x(4), x(5));
+    chi_d = LOS_guidance(e_y, pi_h, Kp_los);
+    psi_ref = chi_d;
+
+    %% Heading reference model
     psi_d = xd(1);
     r_d = xd(2);
     u_d = U_ref;
-
-    if t(i) < t_switch
-        psi_ref = psi_ref_initial;
-    else
-        psi_ref = psi_ref_final;
-    end
-
-
-
     xd_dot = ref_model(xd, psi_ref, omega_ref);
-    
+
     %% Heading PID and anti-windup
     % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Part 2, 2d) Add the heading controller here 
@@ -190,8 +173,12 @@ for i = 1:nTimeSteps
     [xdot,tau_total] = ship(x,u,nu_c,tau_wind);
     
     % store simulation data in a table (for testing)
-    simdata(i,:) = [x(1:3)' x(4:6)' x(7) x(8) u(1) u(2) u_d psi_d r_d];     
- 
+    simdata(i,:) = [x(1:3)' x(4:6)' x(7) x(8) u(1) u(2) u_d psi_d r_d psi_ref];
+    if last
+        fprintf('  Final waypoint reached at %.1f s.\n', t(i));
+        break
+    end
+
     % Euler integration
     % x = euler2(xdot,x,h); 
     % Runge Kutta 4 integration
@@ -208,6 +195,9 @@ for i = 1:nTimeSteps
         fprintf('  %d%% complete\n', 0);
     end
 
+end
+if ~last
+    fprintf('  Time limit reached before arrival.\n');
 end
 simdata = simdata(1:i,:);
 t = t(1:i);
@@ -296,31 +286,33 @@ plot(t,delta_deg,t,delta_c_deg,'linewidth',2);
 title('Actual and commanded rudder angle'); xlabel('Time (s)'); ylabel('Angle (deg)');
 legend('actual rudder angle','commanded rudder angle')
 %% Create objects for 3-D visualization 
-% Since we only simulate 3-DOF we need to construct zero arrays for the 
-% excluded dimensions, including height, roll and pitch
-z = zeros(length(x),1);
-phi = zeros(length(psi),1);
-theta = zeros(length(psi),1);
+if show_animation
+    addpath(genpath('flypath3d_v3'));
+    % Since we only simulate 3-DOF we need to construct zero arrays for the 
+    % excluded dimensions, including height, roll and pitch
+    z = zeros(length(x),1);
+    phi = zeros(length(psi),1);
+    theta = zeros(length(psi),1);
 
-% create object 1: ship (ship1.mat)
-new_object('flypath3d_v3/ship1.mat',[x,y,z,phi,theta,psi],...
-'model','royalNavy2.mat','scale',(max(max(abs(x)),max(abs(y)))/1000),...
-'edge',[0 0 0],'face',[0 0 0],'alpha',1,...
-'path','on','pathcolor',[.89 .0 .27],'pathwidth',2);
+    % create object 1: ship (ship1.mat)
+    new_object('flypath3d_v3/ship1.mat',[x,y,z,phi,theta,psi],...
+    'model','royalNavy2.mat','scale',(max(max(abs(x)),max(abs(y)))/1000),...
+    'edge',[0 0 0],'face',[0 0 0],'alpha',1,...
+    'path','on','pathcolor',[.89 .0 .27],'pathwidth',2);
 
-% Plot trajectories 
-flypath('flypath3d_v3/ship1.mat',...
-'animate','on','step',500,...
-'axis','on','axiscolor',[0 0 0],'color',[1 1 1],...
-'font','Georgia','fontsize',12,...
-'view',[-25 35],'window',[900 900],...
-'xlim', [min(y)-0.1*max(abs(y)),max(y)+0.1*max(abs(y))],... 
-'ylim', [min(x)-0.1*max(abs(x)),max(x)+0.1*max(abs(x))], ...
-'zlim', [-max(max(abs(x)),max(abs(y)))/100,max(max(abs(x)),max(abs(y)))/20]); 
+    % Plot trajectories 
+    flypath('flypath3d_v3/ship1.mat',...
+    'animate','on','step',500,...
+    'axis','on','axiscolor',[0 0 0],'color',[1 1 1],...
+    'font','Georgia','fontsize',12,...
+    'view',[-25 35],'window',[900 900],...
+    'xlim', [min(y)-0.1*max(abs(y)),max(y)+0.1*max(abs(y))],... 
+    'ylim', [min(x)-0.1*max(abs(x)),max(x)+0.1*max(abs(x))], ...
+    'zlim', [-max(max(abs(x)),max(abs(y)))/100,max(max(abs(x)),max(abs(y)))/20]);
+end
 
 %% Heading tracking plot
-psi_command = rad2deg(psi_ref_initial)*ones(size(t));
-psi_command(t >= t_switch) = rad2deg(psi_ref_final);
+psi_command = rad2deg(simdata(:,14));
 
 figure(10);
 clf;
@@ -333,7 +325,7 @@ xlabel('Time (s)');
 ylabel('Heading (deg)');
 legend('Heading command', 'Reference-model heading', ...
     'Actual heading', 'Location', 'best');
-title('Heading tracking: 10 degrees');
+title('Heading tracking with LOS guidance');
 
 %% Map plot
 pathplotter(x,y)
@@ -347,7 +339,8 @@ xd_dot = zeros(3,1);
 xd_dot(1) = xd(2);
 xd_dot(2) = xd(3);
 
-xd_dot(3) = -omega_ref^3*(xd(1) - psi_ref) ...
+heading_error = atan2(sin(xd(1) - psi_ref), cos(xd(1) - psi_ref));
+xd_dot(3) = -omega_ref^3*heading_error ...
     -3*omega_ref^2*xd(2) ...
     -3*omega_ref*xd(3);
 end
